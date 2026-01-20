@@ -8,9 +8,9 @@ on:
         required: true
         default: '/opt/barberhub'
       compose_file:
-        description: 'Arquivo compose a usar (ex: docker-compose.prod.yml)'
+        description: 'Arquivo compose a usar (ex: docker-compose.yml ou docker-compose.prod.yml)'
         required: true
-        default: 'docker-compose.prod.yml'
+        default: 'docker-compose.yml'
 
 jobs:
   deploy:

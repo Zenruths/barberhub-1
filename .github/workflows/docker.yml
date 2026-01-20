@@ -75,15 +75,26 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           script: |
             set -e
 
-            cd "${VPS_PATH:-${{ secrets.VPS_PATH }}}"
+            cd "${{ secrets.VPS_PATH }}"
+
+            if [ ! -d .git ]; then
+              echo "Erro: $PWD não parece ser um repositório git (faltando .git). Clone o repo nessa pasta ou ajuste VPS_PATH." >&2
+              exit 1
+            fi
 
             # Atualiza os arquivos do repo na VPS (ex: docker-compose.prod.yml, envs, nginx, etc.)
             git fetch --all
             git reset --hard origin/main
+
+            # Escolhe o compose: produção (pull de imagens) se existir; senão usa o padrão (build local)
+            COMPOSE_FILE="docker-compose.yml"
+            if [ -f docker-compose.prod.yml ]; then
+              COMPOSE_FILE="docker-compose.prod.yml"
+            fi
 
             # Faz o compose apontar para as imagens publicadas no GHCR deste repo
             export GITHUB_REPOSITORY='${{ github.repository }}'
@@ -93,8 +104,12 @@ jobs:
               echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
             fi
 
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            if [ "$COMPOSE_FILE" = "docker-compose.prod.yml" ]; then
+              docker compose -f "$COMPOSE_FILE" pull
+              docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+            else
+              docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans
+            fi
 
             # Opcional: limpeza leve
             docker image prune -f
