@@ -75,7 +75,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { apiFetch } from '@/services/api'
+import { apiFetch, getApiBaseUrl } from '@/services/api'
 
 const rows = ref([])
 const loading = ref(false)
@@ -86,7 +86,8 @@ const fetchData = async () => {
     loading.value = true
     error.value = ''
 
-    const data = await apiFetch('http://localhost:3000/api/basictables')
+    const baseUrl = getApiBaseUrl()
+    const data = await apiFetch(`${baseUrl}/api/basictables`)
 
     rows.value = data.map((item) => ({
       id: item.id,

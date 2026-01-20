@@ -482,7 +482,7 @@ import AdminLayout from '@/components/layout/AdminLayout.vue'
 import ComponentCard from '@/components/common/ComponentCard.vue'
 import UiButton from '@/components/ui/Button.vue'
 import PlusIcon from '@/icons/PlusIcon.vue'
-import { apiFetch } from '@/services/api'
+import { apiFetch, getApiBaseUrl } from '@/services/api'
 
 const currentPageTitle = ref('Clientes')
 
@@ -582,7 +582,7 @@ onMounted(async () => {
     loading.value = true
     error.value = null
 
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+    const baseUrl = getApiBaseUrl()
     const data = await apiFetch(`${baseUrl}/api/clientes`)
 
     // A API retorna um objeto { items, total, page, pageSize }

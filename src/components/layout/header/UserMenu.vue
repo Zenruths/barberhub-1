@@ -64,6 +64,7 @@
 import { ChevronDownIcon, InfoCircleIcon, LogoutIcon, SettingsIcon, UserCircleIcon } from '@/icons'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
+import { getApiBaseUrl } from '@/services/api'
 
 const router = useRouter()
 const dropdownOpen = ref(false)
@@ -105,7 +106,7 @@ const closeDropdown = () => {
 }
 
 const signOut = async () => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+  const baseUrl = getApiBaseUrl()
 
   const accessToken =
     localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')

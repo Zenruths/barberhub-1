@@ -7,7 +7,11 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/tailadmin-vuejs/' : '/',
+  // Mantém compatibilidade com GH Pages (basePath /tailadmin-vuejs/),
+  // mas permite sobrescrever via variável para Docker/VPS.
+  base:
+    process.env.VITE_BASE ||
+    (process.env.NODE_ENV === 'production' ? '/tailadmin-vuejs/' : '/'),
   plugins: [vue(), vueJsx(), vueDevTools()],
   resolve: {
     alias: {

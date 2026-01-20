@@ -290,6 +290,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Alert from '@/components/ui/Alert.vue'
 import CommonGridShape from '@/components/common/CommonGridShape.vue'
 import FullScreenLayout from '@/components/layout/FullScreenLayout.vue'
+import { getApiBaseUrl } from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -356,7 +357,7 @@ const handleSubmit = async (event: Event) => {
   errorMessage.value = ''
 
   try {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+    const baseUrl = getApiBaseUrl()
 
     const response = await fetch(`${baseUrl}/api/login`, {
       method: 'POST',

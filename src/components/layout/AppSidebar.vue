@@ -309,6 +309,7 @@ const menuGroups = [
         name: "Equipe",
         subItems: [
           { name: "Barbeiros", path: "/equipe/barbeiros", pro: false },
+          { name: "Novo Barbeiro", path: "/equipe/novo-barbeiro", pro: false },
           { name: "Comissões", path: "/equipe/comissoes", pro: false },
           { name: "Escalas", path: "/equipe/escalas", pro: false },
         ],

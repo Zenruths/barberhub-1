@@ -4,6 +4,21 @@
 let isRefreshing = false
 let refreshPromise: Promise<void> | null = null
 
+export function getApiBaseUrl() {
+  const raw = (import.meta.env.VITE_API_BASE_URL ?? '').toString().trim()
+  if (raw) return raw.replace(/\/+$/, '')
+
+  // Em DEV, o frontend roda em 5173 e a API em 3000.
+  if (import.meta.env.DEV) return 'http://localhost:3000'
+
+  // Em produção (Docker + Nginx), o ideal é ficar same-origin.
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+
+  return 'http://localhost:3000'
+}
+
 async function refreshAccessToken() {
   if (isRefreshing && refreshPromise) {
     return refreshPromise
@@ -19,7 +34,7 @@ async function refreshAccessToken() {
       throw new Error('Sem refresh token')
     }
 
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+    const baseUrl = getApiBaseUrl()
 
     const resp = await fetch(`${baseUrl}/api/refresh`, {
       method: 'POST',

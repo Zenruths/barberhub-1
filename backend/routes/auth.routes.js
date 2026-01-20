@@ -1,5 +1,10 @@
 import express from 'express'
 import { login, refresh, logout } from '../services/auth.service.js'
+import { authMiddleware } from '../middleware/authMiddleware.js'
+import db from '../db.js'
+import { getProfissionalByUserId, getGoogleConnectionByUserId } from '../services/profissionais.service.js'
+
+const dbp = typeof db.promise === 'function' ? db.promise() : db
 
 const router = express.Router()
 
@@ -53,6 +58,28 @@ router.post('/logout', async (req, res, next) => {
     return res.json(result)
   } catch (err) {
     console.error('Erro no logout (rota):', err)
+    return next(err)
+  }
+})
+
+// Retorna dados do usuário logado + barbeiro vinculado + status Google
+router.get('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user?.id
+    if (!userId) return res.status(401).json({ error: 'Sessão expirada, faça login novamente.' })
+
+    const [userRows] = await dbp.query('SELECT id, username, email FROM usuarios WHERE id = ? LIMIT 1', [userId])
+
+    if (!userRows.length) {
+      return res.status(401).json({ error: 'Sessão expirada, faça login novamente.' })
+    }
+
+    const user = userRows[0]
+    const profissional = await getProfissionalByUserId(userId)
+    const google = await getGoogleConnectionByUserId(userId)
+
+    return res.json({ user, profissional, google })
+  } catch (err) {
     return next(err)
   }
 })

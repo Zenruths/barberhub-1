@@ -319,6 +319,14 @@ const router = createRouter({
       },
     },
     {
+      path: '/equipe/novo-barbeiro',
+      name: 'EquipeNovoBarbeiro',
+      component: () => import('../views/Equipe/NovoBarbeiro.vue'),
+      meta: {
+        title: 'Equipe - Novo Barbeiro',
+      },
+    },
+    {
       path: '/equipe/comissoes',
       name: 'EquipeComissoes',
       component: () => import('../views/Equipe/Comissoes.vue'),

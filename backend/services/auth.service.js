@@ -18,7 +18,7 @@ export async function login({ email, password, keepLoggedIn, ip, userAgent }) {
 
   const sql = 'SELECT * FROM usuarios WHERE email = ? LIMIT 1'
 
-  const [results] = await db.promise().query(sql, [email])
+  const [results] = await db.query(sql, [email])
 
   if (!results.length) {
     // registra tentativa de login falha (sem user_id)
@@ -26,7 +26,7 @@ export async function login({ email, password, keepLoggedIn, ip, userAgent }) {
       'INSERT INTO user_login_logs (user_id, username, email, ip_address, device_info, success, user_agent) VALUES (NULL, NULL, ?, ?, ?, FALSE, ?)'
     const deviceInfo = userAgent
 
-    await db.promise().query(logSql, [email, ip, deviceInfo, userAgent])
+    await db.query(logSql, [email, ip, deviceInfo, userAgent])
 
     const error = new Error('Usuário ou senha inválidos')
     error.status = 401
@@ -42,9 +42,7 @@ export async function login({ email, password, keepLoggedIn, ip, userAgent }) {
       'INSERT INTO user_login_logs (user_id, username, email, ip_address, device_info, success, user_agent) VALUES (?, ?, ?, ?, ?, FALSE, ?)'
     const deviceInfo = userAgent
 
-    await db
-      .promise()
-      .query(logSql, [user.id, user.username, user.email, ip, deviceInfo, userAgent])
+    await db.query(logSql, [user.id, user.username, user.email, ip, deviceInfo, userAgent])
 
     const error = new Error('Usuário ou senha inválidos')
     error.status = 401
@@ -68,23 +66,19 @@ export async function login({ email, password, keepLoggedIn, ip, userAgent }) {
     : REFRESH_TOKEN_IDLE_MINUTES
 
   try {
-    await db
-      .promise()
-      .query(
-        `INSERT INTO user_refresh_tokens (user_id, token_hash, created_at, last_used_at, expires_at)
+    await db.query(
+      `INSERT INTO user_refresh_tokens (user_id, token_hash, created_at, last_used_at, expires_at)
          VALUES (?, ?, NOW(), NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
-        [user.id, refreshTokenHash, idleMinutes]
-      )
+      [user.id, refreshTokenHash, idleMinutes]
+    )
 
     // Opcional: invalidar outros refresh tokens ativos do mesmo usuário (sessão única)
-    await db
-      .promise()
-      .query(
-        `UPDATE user_refresh_tokens
+    await db.query(
+      `UPDATE user_refresh_tokens
          SET revoked = TRUE
          WHERE user_id = ? AND revoked = FALSE AND token_hash <> ?`,
-        [user.id, refreshTokenHash]
-      )
+      [user.id, refreshTokenHash]
+    )
   } catch (tokenErr) {
     console.error('Erro ao registrar refresh token:', tokenErr)
     const error = new Error('Erro ao criar sessão de usuário')
@@ -98,9 +92,7 @@ export async function login({ email, password, keepLoggedIn, ip, userAgent }) {
   const deviceInfo = userAgent
 
   try {
-    await db
-      .promise()
-      .query(logSql, [user.id, user.username, user.email, ip, deviceInfo, userAgent])
+    await db.query(logSql, [user.id, user.username, user.email, ip, deviceInfo, userAgent])
   } catch (logErr) {
     console.error('Erro ao registrar log de login:', logErr)
     // não bloqueamos o login por causa de erro no log
@@ -122,9 +114,7 @@ export async function refresh({ refreshToken }) {
   }
 
   // Buscar todos os tokens não revogados
-  const [rows] = await db
-    .promise()
-    .query('SELECT * FROM user_refresh_tokens WHERE revoked = FALSE')
+  const [rows] = await db.query('SELECT * FROM user_refresh_tokens WHERE revoked = FALSE')
 
   let tokenRow = null
   for (const row of rows) {
@@ -142,33 +132,27 @@ export async function refresh({ refreshToken }) {
   }
 
   // Verificar expiração por inatividade
-  const [nowRows] = await db.promise().query('SELECT NOW() AS now')
+  const [nowRows] = await db.query('SELECT NOW() AS now')
   const now = nowRows[0].now
 
   if (now > tokenRow.expires_at) {
-    await db
-      .promise()
-      .query('UPDATE user_refresh_tokens SET revoked = TRUE WHERE id = ?', [tokenRow.id])
+    await db.query('UPDATE user_refresh_tokens SET revoked = TRUE WHERE id = ?', [tokenRow.id])
     const error = new Error('Sessão expirada, faça login novamente.')
     error.status = 401
     throw error
   }
 
   // Atualizar last_used_at e renovar expires_at (idle timeout)
-  await db
-    .promise()
-    .query(
-      `UPDATE user_refresh_tokens
+  await db.query(
+    `UPDATE user_refresh_tokens
        SET last_used_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)
        WHERE id = ?`,
-      [REFRESH_TOKEN_IDLE_MINUTES, tokenRow.id]
-    )
+    [REFRESH_TOKEN_IDLE_MINUTES, tokenRow.id]
+  )
 
   const userId = tokenRow.user_id
 
-  const [userRows] = await db
-    .promise()
-    .query('SELECT id, username, email FROM usuarios WHERE id = ? LIMIT 1', [userId])
+  const [userRows] = await db.query('SELECT id, username, email FROM usuarios WHERE id = ? LIMIT 1', [userId])
 
   if (!userRows.length) {
     const error = new Error('Usuário não encontrado.')
@@ -200,33 +184,27 @@ export async function logout({ accessToken, refreshToken }) {
       if (decoded?.id) {
         const userId = decoded.id
 
-        await db
-          .promise()
-          .query(
-            `UPDATE user_login_logs
+        await db.query(
+          `UPDATE user_login_logs
              SET logout_time = CURRENT_TIMESTAMP
              WHERE user_id = ?
                AND success = TRUE
                AND logout_time IS NULL
              ORDER BY login_time DESC
              LIMIT 1`,
-            [userId]
-          )
+          [userId]
+        )
       }
     }
 
     // Revogar refresh token, se enviado
     if (refreshToken) {
-      const [rows] = await db
-        .promise()
-        .query('SELECT * FROM user_refresh_tokens WHERE revoked = FALSE')
+      const [rows] = await db.query('SELECT * FROM user_refresh_tokens WHERE revoked = FALSE')
 
       for (const row of rows) {
         const match = await bcrypt.compare(refreshToken, row.token_hash)
         if (match) {
-          await db
-            .promise()
-            .query('UPDATE user_refresh_tokens SET revoked = TRUE WHERE id = ?', [row.id])
+          await db.query('UPDATE user_refresh_tokens SET revoked = TRUE WHERE id = ?', [row.id])
           break
         }
       }
