@@ -12,7 +12,7 @@ on:
       compose_file:
         description: "Arquivo compose a usar (docker-compose.yml ou docker-compose.prod.yml)"
         required: false
-        default: "docker-compose.prod.yml"
+        default: "docker-compose.yml"
       prune:
         description: "Limpar imagens/cache antigos (true/false)"
         required: false
