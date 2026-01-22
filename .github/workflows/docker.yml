@@ -79,7 +79,7 @@ jobs:
           script: |
             set -e
 
-            cd "${{ secrets.VPS_PATH }}"
+            cd /docker/barberhub || { echo "Erro: diretório /docker/barberhub não existe"; exit 1; }
 
             if [ ! -d .git ]; then
               echo "Erro: $PWD não parece ser um repositório git (faltando .git). Clone o repo nessa pasta ou ajuste VPS_PATH." >&2
