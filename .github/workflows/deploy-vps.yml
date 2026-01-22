@@ -32,6 +32,8 @@ jobs:
       COMPOSE_FILE: ${{ github.event.inputs.compose_file || secrets.VPS_COMPOSE_FILE || 'docker-compose.prod.yml' }}
       PRUNE: ${{ github.event.inputs.prune || 'true' }}
       DEPLOY_BRANCH: main
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
+      GHCR_USER: ${{ secrets.GHCR_USER || github.actor }}
 
     steps:
       - name: Deploy via SSH
@@ -42,6 +44,8 @@ jobs:
           port: ${{ secrets.VPS_PORT || '22' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 30m
+          envs: REMOTE_PATH,COMPOSE_FILE,PRUNE,DEPLOY_BRANCH,GHCR_PAT,GHCR_USER
+          allenvs: false
           script_stop: true
           script: |
             set -Eeuo pipefail
