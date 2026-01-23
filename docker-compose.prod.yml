@@ -61,5 +61,30 @@ services:
       timeout: 5s
       retries: 20
 
+  # Garante grants corretos para o usuário do app (rede Docker)
+  # Útil quando existe volume antigo com usuário criado como 'user'@'localhost'
+  db-init:
+    image: mariadb:11
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-edenerp}
+      MARIADB_USER: ${DB_USER:-barberhub}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-barberhub}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mariadb -h db -uroot -p"$MARIADB_ROOT_PASSWORD" -e "\
+        CREATE DATABASE IF NOT EXISTS \`$MARIADB_DATABASE\`;\
+        CREATE USER IF NOT EXISTS '$MARIADB_USER'@'%' IDENTIFIED BY '$MARIADB_PASSWORD';\
+        ALTER USER '$MARIADB_USER'@'%' IDENTIFIED BY '$MARIADB_PASSWORD';\
+        GRANT ALL PRIVILEGES ON \`$MARIADB_DATABASE\`.* TO '$MARIADB_USER'@'%';\
+        FLUSH PRIVILEGES;\
+        "
+
 volumes:
   db_data:
