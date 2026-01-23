@@ -50,6 +50,7 @@ services:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
     volumes:
       - db_data:/var/lib/mysql
+      - db_socket:/run/mysqld
       # Se quiser importar o schema na primeira subida (somente com volume vazio), descomente:
       # - ./backend/database.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     # Para acessar o banco pela VPS sem expor publicamente, recomendo bind apenas no localhost:
@@ -66,7 +67,6 @@ services:
   db-init:
     image: mariadb:11
     restart: "no"
-    network_mode: "service:db"
     depends_on:
       db:
         condition: service_healthy
@@ -75,17 +75,20 @@ services:
       MARIADB_USER: ${DB_USER:-barberhub}
       MARIADB_PASSWORD: ${DB_PASSWORD:-barberhub}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    volumes:
+      - db_socket:/run/mysqld
     entrypoint:
       - sh
       - -c
       - |
-        mariadb -h 127.0.0.1 -uroot -p"$$MARIADB_ROOT_PASSWORD" -e "\
-        CREATE DATABASE IF NOT EXISTS \`$$MARIADB_DATABASE\`;\
-        CREATE USER IF NOT EXISTS '$$MARIADB_USER'@'%' IDENTIFIED BY '$$MARIADB_PASSWORD';\
-        ALTER USER '$$MARIADB_USER'@'%' IDENTIFIED BY '$$MARIADB_PASSWORD';\
-        GRANT ALL PRIVILEGES ON \`$$MARIADB_DATABASE\`.* TO '$$MARIADB_USER'@'%';\
+        mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -uroot -p"$${MARIADB_ROOT_PASSWORD}" -e "\
+        CREATE DATABASE IF NOT EXISTS \`$${MARIADB_DATABASE}\`;\
+        CREATE USER IF NOT EXISTS '$${MARIADB_USER}'@'%' IDENTIFIED BY '$${MARIADB_PASSWORD}';\
+        ALTER USER '$${MARIADB_USER}'@'%' IDENTIFIED BY '$${MARIADB_PASSWORD}';\
+        GRANT ALL PRIVILEGES ON \`$${MARIADB_DATABASE}\`.* TO '$${MARIADB_USER}'@'%';\
         FLUSH PRIVILEGES;\
         "
 
 volumes:
   db_data:
+  db_socket:
