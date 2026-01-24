@@ -61,6 +61,19 @@ async function assertProfissionalDoUsuario(userId) {
   return profissional
 }
 
+async function requireGoogleConnected(userId) {
+  try {
+    return await getAuthenticatedGoogleClientForUser(userId)
+  } catch (err) {
+    // Mantém status do erro quando existir (ex: 409), mas garante uma mensagem clara.
+    const status = err?.status || 409
+    const msg = err?.message || 'Conecte sua conta Google para continuar.'
+    const wrapped = new Error(msg)
+    wrapped.status = status
+    throw wrapped
+  }
+}
+
 export async function listAgendamentosForLoggedUser({ userId, start, end }) {
   await ensureAgendamentosSchema()
 
@@ -121,6 +134,10 @@ export async function createAgendamentoForLoggedUser({
 
   const profissional = await assertProfissionalDoUsuario(userId)
 
+  // Regra: para criar/gerenciar agendamentos, o usuário precisa estar conectado ao Google.
+  // Mesmo que o frontend não envie syncGoogle, aqui a sincronização é mandatória.
+  const { calendar, calendarId } = await requireGoogleConnected(userId)
+
   if (!clienteId || !servicoId || !dataHoraInicio || !dataHoraFim) {
     const err = new Error('clienteId, servicoId, dataHoraInicio e dataHoraFim são obrigatórios.')
     err.status = 400
@@ -176,37 +193,36 @@ export async function createAgendamentoForLoggedUser({
 
     let googleEventId = null
 
-    if (syncGoogle) {
-      const { calendar, calendarId } = await getAuthenticatedGoogleClientForUser(userId)
+    // Sync obrigatório (mantém parâmetro syncGoogle só por compatibilidade)
+    void syncGoogle
 
-      const startIso = toIsoDateTime(dataHoraInicio)
-      const endIso = toIsoDateTime(dataHoraFim)
-      if (!startIso || !endIso) {
-        const err = new Error('Datas inválidas para sincronização com Google Calendar.')
-        err.status = 400
-        throw err
-      }
+    const startIso = toIsoDateTime(dataHoraInicio)
+    const endIso = toIsoDateTime(dataHoraFim)
+    if (!startIso || !endIso) {
+      const err = new Error('Datas inválidas para sincronização com Google Calendar.')
+      err.status = 400
+      throw err
+    }
 
-      const summary = `${servico.nome} - ${cliente.nome}`
+    const summary = `${servico.nome} - ${cliente.nome}`
 
-      const resp = await calendar.events.insert({
-        calendarId,
-        requestBody: {
-          summary,
-          description: observacoes || undefined,
-          start: { dateTime: startIso, timeZone },
-          end: { dateTime: endIso, timeZone },
-        },
-      })
+    const resp = await calendar.events.insert({
+      calendarId,
+      requestBody: {
+        summary,
+        description: observacoes || undefined,
+        start: { dateTime: startIso, timeZone },
+        end: { dateTime: endIso, timeZone },
+      },
+    })
 
-      googleEventId = resp?.data?.id || null
+    googleEventId = resp?.data?.id || null
 
-      if (googleEventId) {
-        await conn.query('UPDATE agendamentos SET google_event_id = ? WHERE id = ?', [
-          googleEventId,
-          agendamentoId,
-        ])
-      }
+    if (googleEventId) {
+      await conn.query('UPDATE agendamentos SET google_event_id = ? WHERE id = ?', [
+        googleEventId,
+        agendamentoId,
+      ])
     }
 
     await conn.commit()
@@ -237,6 +253,9 @@ export async function updateAgendamentoForLoggedUser({
   await ensureAgendamentosSchema()
 
   const profissional = await assertProfissionalDoUsuario(userId)
+
+  // Regra: para criar/gerenciar agendamentos, o usuário precisa estar conectado ao Google.
+  const { calendar, calendarId } = await requireGoogleConnected(userId)
 
   if (!agendamentoId) {
     const err = new Error('agendamentoId é obrigatório.')
@@ -284,63 +303,61 @@ export async function updateAgendamentoForLoggedUser({
       params
     )
 
-    // Se pediu sync, tenta criar/atualizar no Google
-    if (syncGoogle) {
-      const nextClienteId = allowed.cliente_id ?? current.cliente_id
-      const nextServicoId = allowed.servico_id ?? current.servico_id
-      const nextInicio = allowed.data_hora_inicio ?? current.data_hora_inicio
-      const nextFim = allowed.data_hora_fim ?? current.data_hora_fim
-      const nextObs = allowed.observacoes ?? current.observacoes
+    // Sync obrigatório (mantém parâmetro syncGoogle só por compatibilidade)
+    void syncGoogle
 
-      const [[cliente]] = await conn.query('SELECT id, nome FROM clientes WHERE id = ? LIMIT 1', [
-        nextClienteId,
-      ])
-      const [[servico]] = await conn.query('SELECT id, nome FROM servicos WHERE id = ? LIMIT 1', [
-        nextServicoId,
-      ])
+    const nextClienteId = allowed.cliente_id ?? current.cliente_id
+    const nextServicoId = allowed.servico_id ?? current.servico_id
+    const nextInicio = allowed.data_hora_inicio ?? current.data_hora_inicio
+    const nextFim = allowed.data_hora_fim ?? current.data_hora_fim
+    const nextObs = allowed.observacoes ?? current.observacoes
 
-      const summary = `${servico?.nome || 'Serviço'} - ${cliente?.nome || 'Cliente'}`
+    const [[cliente]] = await conn.query('SELECT id, nome FROM clientes WHERE id = ? LIMIT 1', [
+      nextClienteId,
+    ])
+    const [[servico]] = await conn.query('SELECT id, nome FROM servicos WHERE id = ? LIMIT 1', [
+      nextServicoId,
+    ])
 
-      const { calendar, calendarId } = await getAuthenticatedGoogleClientForUser(userId)
+    const summary = `${servico?.nome || 'Serviço'} - ${cliente?.nome || 'Cliente'}`
 
-      const startIso = toIsoDateTime(nextInicio)
-      const endIso = toIsoDateTime(nextFim)
+    const startIso = toIsoDateTime(nextInicio)
+    const endIso = toIsoDateTime(nextFim)
 
-      if (!startIso || !endIso) {
-        const err = new Error('Datas inválidas para sincronização com Google Calendar.')
-        err.status = 400
-        throw err
-      }
+    if (!startIso || !endIso) {
+      const err = new Error('Datas inválidas para sincronização com Google Calendar.')
+      err.status = 400
+      throw err
+    }
 
-      if (current.google_event_id) {
-        await calendar.events.patch({
-          calendarId,
-          eventId: current.google_event_id,
-          requestBody: {
-            summary,
-            description: nextObs || undefined,
-            start: { dateTime: startIso, timeZone },
-            end: { dateTime: endIso, timeZone },
-          },
-        })
-      } else {
-        const resp = await calendar.events.insert({
-          calendarId,
-          requestBody: {
-            summary,
-            description: nextObs || undefined,
-            start: { dateTime: startIso, timeZone },
-            end: { dateTime: endIso, timeZone },
-          },
-        })
+    if (current.google_event_id) {
+      await calendar.events.patch({
+        calendarId,
+        eventId: current.google_event_id,
+        requestBody: {
+          summary,
+          description: nextObs || undefined,
+          start: { dateTime: startIso, timeZone },
+          end: { dateTime: endIso, timeZone },
+        },
+      })
+    } else {
+      const resp = await calendar.events.insert({
+        calendarId,
+        requestBody: {
+          summary,
+          description: nextObs || undefined,
+          start: { dateTime: startIso, timeZone },
+          end: { dateTime: endIso, timeZone },
+        },
+      })
 
-        const googleEventId = resp?.data?.id || null
-        if (googleEventId) {
-          await conn.query('UPDATE agendamentos SET google_event_id = ? WHERE id = ?', [
-            googleEventId,
-            agendamentoId,
-          ])
-        }
+      const googleEventId = resp?.data?.id || null
+      if (googleEventId) {
+        await conn.query('UPDATE agendamentos SET google_event_id = ? WHERE id = ?', [
+          googleEventId,
+          agendamentoId,
+        ])
       }
     }
 
@@ -363,6 +380,9 @@ export async function deleteAgendamentoForLoggedUser({ userId, agendamentoId, sy
 
   const profissional = await assertProfissionalDoUsuario(userId)
 
+  // Regra: para criar/gerenciar agendamentos, o usuário precisa estar conectado ao Google.
+  const { calendar, calendarId } = await requireGoogleConnected(userId)
+
   const conn = await dbp.getConnection()
   try {
     await conn.beginTransaction()
@@ -380,8 +400,10 @@ export async function deleteAgendamentoForLoggedUser({ userId, agendamentoId, sy
 
     const current = rows[0]
 
-    if (syncGoogle && current.google_event_id) {
-      const { calendar, calendarId } = await getAuthenticatedGoogleClientForUser(userId)
+    // Sync obrigatório (mantém parâmetro syncGoogle só por compatibilidade)
+    void syncGoogle
+
+    if (current.google_event_id) {
       try {
         await calendar.events.delete({ calendarId, eventId: current.google_event_id })
       } catch {
