@@ -1,31 +1,10 @@
 <template>
   <AdminLayout>
     <PageBreadcrumb :pageTitle="currentPageTitle" />
-    <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div v-if="loading" class="p-6 text-sm text-gray-500 dark:text-gray-400">
-        Carregando...
-      </div>
-
-      <div v-else-if="googleConnected === false" class="p-6 space-y-3">
-        <p class="text-sm text-gray-700 dark:text-gray-300">
-          Para criar e gerenciar agendamentos, é obrigatório conectar sua conta do Google Calendar.
-        </p>
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          @click="handleConnectGoogle"
-        >
-          Conectar Google Calendar
-        </button>
-        <p v-if="errorMessage" class="text-sm text-red-600">
-          {{ errorMessage }}
-        </p>
-      </div>
-
-      <div v-else class="custom-calendar">
-        <div v-if="errorMessage" class="p-4 text-sm text-red-600">
-          {{ errorMessage }}
-        </div>
+    <div
+      class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+    >
+      <div class="custom-calendar">
         <FullCalendar ref="calendarRef" class="min-h-screen" :options="calendarOptions" />
       </div>
 
@@ -243,16 +222,13 @@
 import AdminLayout from '@/components/layout/AdminLayout.vue'
 import PageBreadcrumb from '@/components/common/PageBreadcrumb.vue'
 
+const currentPageTitle = ref('Calendar')
 import { ref, reactive, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import Modal from '@/components/profile/Modal.vue'
-import { apiFetch, getApiBaseUrl } from '@/services/api'
-
-const currentPageTitle = ref('Agenda')
 
 const calendarRef = ref(null)
 const isOpen = ref(false)
@@ -260,14 +236,8 @@ const selectedEvent = ref(null)
 const eventTitle = ref('')
 const eventStartDate = ref('')
 const eventEndDate = ref('')
-const eventLevel = ref('Primary')
+const eventLevel = ref('')
 const events = ref([])
-
-const loading = ref(true)
-const googleConnected = ref(null)
-const errorMessage = ref('')
-
-const route = useRoute()
 
 const calendarsEvents = reactive({
   Danger: 'danger',
@@ -276,98 +246,28 @@ const calendarsEvents = reactive({
   Warning: 'warning',
 })
 
-const formatDateInput = (date) => {
-  if (!date) return ''
-  const d = new Date(date)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const addDays = (dateStr, days) => {
-  if (!dateStr) return ''
-  const d = new Date(`${dateStr}T00:00:00`)
-  d.setDate(d.getDate() + days)
-  return formatDateInput(d)
-}
-
-const toGoogleRequestBody = () => {
-  const start = eventStartDate.value
-  const end = eventEndDate.value || eventStartDate.value
-  const endExclusive = addDays(end, 1)
-
-  return {
-    summary: eventTitle.value,
-    start: { date: start },
-    end: { date: endExclusive },
-    extendedProperties: {
-      private: {
-        calendarLevel: eventLevel.value || 'Primary',
-      },
+onMounted(() => {
+  events.value = [
+    {
+      id: '1',
+      title: 'Event Conf.',
+      start: new Date().toISOString().split('T')[0],
+      extendedProps: { calendar: 'Danger' },
     },
-  }
-}
-
-const mapGoogleEventToCalendar = (item) => {
-  const isAllDay = Boolean(item?.start?.date)
-  const start = isAllDay ? item.start.date : item.start?.dateTime
-  const end = isAllDay ? item.end?.date : item.end?.dateTime
-
-  return {
-    id: item.id,
-    title: item.summary || '(Sem título)',
-    start,
-    end,
-    allDay: isAllDay,
-    extendedProps: {
-      calendar: item.extendedProperties?.private?.calendarLevel || 'Primary',
-      google: true,
+    {
+      id: '2',
+      title: 'Meeting',
+      start: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      extendedProps: { calendar: 'Success' },
     },
-  }
-}
-
-const getErrorMessage = (e) => {
-  if (e && typeof e === 'object' && 'message' in e) {
-    const msg = e.message
-    if (typeof msg === 'string' && msg.trim()) return msg
-  }
-  return 'Erro inesperado.'
-}
-
-const loadGoogleStatus = async () => {
-  const baseUrl = getApiBaseUrl()
-  const me = await apiFetch(`${baseUrl}/api/me`)
-  googleConnected.value = Boolean(me?.google?.connected)
-}
-
-const loadGoogleEvents = async () => {
-  const baseUrl = getApiBaseUrl()
-  const timeMin = new Date().toISOString()
-  const timeMax = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90).toISOString()
-
-  const data = await apiFetch(
-    `${baseUrl}/api/google/events?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
-  )
-
-  const items = Array.isArray(data?.items) ? data.items : []
-  events.value = items.map(mapGoogleEventToCalendar)
-}
-
-onMounted(async () => {
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    await loadGoogleStatus()
-    if (googleConnected.value) {
-      await loadGoogleEvents()
-    }
-  } catch (e) {
-    errorMessage.value = getErrorMessage(e)
-    googleConnected.value = false
-  } finally {
-    loading.value = false
-  }
+    {
+      id: '3',
+      title: 'Workshop',
+      start: new Date(Date.now() + 172800000).toISOString().split('T')[0],
+      end: new Date(Date.now() + 259200000).toISOString().split('T')[0],
+      extendedProps: { calendar: 'Primary' },
+    },
+  ]
 })
 
 const openModal = () => {
@@ -383,18 +283,14 @@ const resetModalFields = () => {
   eventTitle.value = ''
   eventStartDate.value = ''
   eventEndDate.value = ''
-  eventLevel.value = 'Primary'
+  eventLevel.value = ''
   selectedEvent.value = null
 }
 
 const handleDateSelect = (selectInfo) => {
   resetModalFields()
-  eventStartDate.value = formatDateInput(selectInfo.startStr)
-  if (selectInfo.endStr) {
-    eventEndDate.value = addDays(formatDateInput(selectInfo.endStr), -1)
-  } else {
-    eventEndDate.value = eventStartDate.value
-  }
+  eventStartDate.value = selectInfo.startStr
+  eventEndDate.value = selectInfo.endStr || selectInfo.startStr
   openModal()
 }
 
@@ -402,86 +298,49 @@ const handleEventClick = (clickInfo) => {
   const event = clickInfo.event
   selectedEvent.value = event
   eventTitle.value = event.title
-  eventStartDate.value = formatDateInput(event.start)
-  if (event.allDay && event.end) {
-    eventEndDate.value = addDays(formatDateInput(event.end), -1)
-  } else {
-    eventEndDate.value = formatDateInput(event.end) || eventStartDate.value
-  }
-  eventLevel.value = event.extendedProps?.calendar || 'Primary'
+  eventStartDate.value = event.start?.toISOString().split('T')[0] || ''
+  eventEndDate.value = event.end?.toISOString().split('T')[0] || ''
+  eventLevel.value = event.extendedProps.calendar
   openModal()
 }
 
-const handleAddOrUpdateEvent = async () => {
-  errorMessage.value = ''
-  try {
-    const baseUrl = getApiBaseUrl()
-    const requestBody = toGoogleRequestBody()
-
-    if (selectedEvent.value) {
-      const eventId = selectedEvent.value.id
-      const data = await apiFetch(`${baseUrl}/api/google/events/${eventId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestBody }),
-      })
-
-      const updated = mapGoogleEventToCalendar(data?.event)
-      updated.extendedProps = { calendar: eventLevel.value, google: true }
-
-      events.value = events.value.map((ev) => (ev.id === updated.id ? updated : ev))
-    } else {
-      const data = await apiFetch(`${baseUrl}/api/google/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestBody }),
-      })
-
-      const created = mapGoogleEventToCalendar(data?.event)
-      created.extendedProps = { calendar: eventLevel.value, google: true }
-
-      events.value = [created, ...events.value]
+const handleAddOrUpdateEvent = () => {
+  if (selectedEvent.value) {
+    // Update existing event
+    events.value = events.value.map((event) =>
+      event.id === selectedEvent.value.id
+        ? {
+            ...event,
+            title: eventTitle.value,
+            start: eventStartDate.value,
+            end: eventEndDate.value,
+            extendedProps: { calendar: eventLevel.value },
+          }
+        : event,
+    )
+  } else {
+    // Add new event
+    const newEvent = {
+      id: Date.now().toString(),
+      title: eventTitle.value,
+      start: eventStartDate.value,
+      end: eventEndDate.value,
+      allDay: true,
+      extendedProps: { calendar: eventLevel.value },
     }
-
-    closeModal()
-  } catch (e) {
-    errorMessage.value = getErrorMessage(e)
+    events.value.push(newEvent)
   }
+  closeModal()
 }
-
-const handleDeleteEvent = async () => {
-  if (!selectedEvent.value) return
-  errorMessage.value = ''
-  try {
-    const baseUrl = getApiBaseUrl()
-    const eventId = selectedEvent.value.id
-    await apiFetch(`${baseUrl}/api/google/events/${eventId}`, { method: 'DELETE' })
-    events.value = events.value.filter((event) => event.id !== eventId)
+const handleDeleteEvent = () => {
+  if (selectedEvent.value) {
+    events.value = events.value.filter((event) => event.id !== selectedEvent.value.id)
     closeModal()
-  } catch (e) {
-    errorMessage.value = getErrorMessage(e)
-  }
-}
-
-const handleConnectGoogle = async () => {
-  errorMessage.value = ''
-  try {
-    const baseUrl = getApiBaseUrl()
-    const redirect = `${window.location.origin}${route.fullPath}`
-    const data = await apiFetch(`${baseUrl}/api/auth/google?redirect=${encodeURIComponent(redirect)}`)
-
-    const url = data?.url
-    if (!url) throw new Error('URL de conexão não retornada pela API.')
-
-    window.location.href = url
-  } catch (e) {
-    errorMessage.value = getErrorMessage(e) || 'Erro ao iniciar conexão com o Google.'
   }
 }
 
 const renderEventContent = (eventInfo) => {
-  const level = eventInfo.event.extendedProps?.calendar || 'Primary'
-  const colorClass = `fc-bg-${String(level).toLowerCase()}`
+  const colorClass = `fc-bg-${eventInfo.event.extendedProps.calendar.toLowerCase()}`
   return {
     html: `
       <div class="event-fc-color flex fc-event-main ${colorClass} p-1 rounded-sm">
