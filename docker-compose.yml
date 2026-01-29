@@ -1,115 +1,115 @@
 services:
-	nginx:
-		image: nginx:alpine
-		restart: unless-stopped
-		ports:
-			- "80:80"
-		volumes:
-			- ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-		depends_on:
-			- web
-			- api
-		networks:
-			- webnet
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - api
+    networks:
+      - webnet
 
-	api:
-		build:
-			context: .
-			dockerfile: Dockerfile.api
-		restart: unless-stopped
-		environment:
-			PORT: 3000
-			DB_HOST: db
-			DB_PORT: 3306
-			DB_NAME: ${DB_NAME:-edenerp}
-			DB_USER: ${DB_USER:-barberhub}
-			DB_PASSWORD: ${DB_PASSWORD:-barberhub}
-			JWT_SECRET: ${JWT_SECRET:-change-me}
-			FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-			GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-			GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-			GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
-			GOOGLE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_TOKEN_ENCRYPTION_KEY:-}
-		depends_on:
-			db:
-				condition: service_healthy
-		expose:
-			- "3000"
-		healthcheck:
-			test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
-			interval: 10s
-			timeout: 3s
-			retries: 10
-		networks:
-			- webnet
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-edenerp}
+      DB_USER: ${DB_USER:-barberhub}
+      DB_PASSWORD: ${DB_PASSWORD:-barberhub}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      GOOGLE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_TOKEN_ENCRYPTION_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - webnet
 
-	web:
-		build:
-			context: .
-			dockerfile: Dockerfile.web
-		restart: unless-stopped
-		depends_on:
-			api:
-				condition: service_healthy
-		expose:
-			- "80"
-		healthcheck:
-			test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
-		networks:
-			- webnet
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+    networks:
+      - webnet
 
-	db:
-		image: mariadb:11
-		restart: unless-stopped
-		ports:
-			- "0.0.0.0:3306:3306"
-		environment:
-			MARIADB_DATABASE: ${DB_NAME:-edenerp}
-			MARIADB_USER: ${DB_USER:-barberhub}
-			MARIADB_PASSWORD: ${DB_PASSWORD:-barberhub}
-			MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
-		volumes:
-			- db_data:/var/lib/mysql
-			- db_socket:/run/mysqld
-		healthcheck:
-			test: ["CMD-SHELL", "mariadb-admin ping -h 0.0.0.0 -uroot -p\"$${MARIADB_ROOT_PASSWORD}\" --silent"]
-			interval: 10s
-			timeout: 5s
-			retries: 20
-		networks:
-			- webnet
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:3306:3306"
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-edenerp}
+      MARIADB_USER: ${DB_USER:-barberhub}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-barberhub}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    volumes:
+      - db_data:/var/lib/mysql
+      - db_socket:/run/mysqld
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 0.0.0.0 -uroot -p\"$${MARIADB_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - webnet
 
-	db-init:
-		image: mariadb:11
-		restart: "no"
-		depends_on:
-			db:
-				condition: service_healthy
-		environment:
-			MARIADB_DATABASE: ${DB_NAME:-edenerp}
-			MARIADB_USER: ${DB_USER:-barberhub}
-			MARIADB_PASSWORD: ${DB_PASSWORD:-barberhub}
-			MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
-		volumes:
-			- db_socket:/run/mysqld
-		entrypoint:
-			- sh
-			- -c
-			- |
-				mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -uroot -p"$${MARIADB_ROOT_PASSWORD}" -e "\
-				CREATE DATABASE IF NOT EXISTS \`$${MARIADB_DATABASE}\`;\
-				CREATE USER IF NOT EXISTS '$${MARIADB_USER}'@'%' IDENTIFIED BY '$${MARIADB_PASSWORD}';\
-				ALTER USER '$${MARIADB_USER}'@'%' IDENTIFIED BY '$${MARIADB_PASSWORD}';\
-				GRANT ALL PRIVILEGES ON \`$${MARIADB_DATABASE}\`.* TO '$${MARIADB_USER}'@'%';\
-				FLUSH PRIVILEGES;\
-				"
-		networks:
-			- webnet
+  db-init:
+    image: mariadb:11
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-edenerp}
+      MARIADB_USER: ${DB_USER:-barberhub}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-barberhub}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
+    volumes:
+      - db_socket:/run/mysqld
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mariadb --protocol=socket --socket=/run/mysqld/mysqld.sock -uroot -p"$${MARIADB_ROOT_PASSWORD}" -e "\
+        CREATE DATABASE IF NOT EXISTS \`$${MARIADB_DATABASE}\`;\
+        CREATE USER IF NOT EXISTS '$${MARIADB_USER}'@'%' IDENTIFIED BY '$${MARIADB_PASSWORD}';\
+        ALTER USER '$${MARIADB_USER}'@'%' IDENTIFIED BY '$${MARIADB_PASSWORD}';\
+        GRANT ALL PRIVILEGES ON \`$${MARIADB_DATABASE}\`.* TO '$${MARIADB_USER}'@'%';\
+        FLUSH PRIVILEGES;\
+        "
+    networks:
+      - webnet
 
 volumes:
-	db_data:
-	db_socket:
+  db_data:
+  db_socket:
 
 networks:
-	webnet:
-		driver: bridge
+  webnet:
+    driver: bridge
