@@ -2,7 +2,7 @@
   <AdminLayout>
     <PageBreadcrumb :pageTitle="currentPageTitle" />
     <div class="p-6 space-y-3">
-      <h1 class="text-2xl font-semibold">Venda de Balcão teste</h1>
+      <h1 class="text-2xl font-semibold">Venda de Balcão teste 2</h1>
       <p class="text-sm text-gray-500 dark:text-gray-400">
         Módulo Comercial → Venda de Balcão.
       </p>
